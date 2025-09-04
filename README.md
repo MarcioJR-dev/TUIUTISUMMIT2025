@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Ficha Técnica Automática - Demo
 
 ## Como rodar o projeto
@@ -89,3 +90,7 @@ module.exports = {
 ---
 
 Pronto! Agora você pode demonstrar o upload de um PDF e a geração da ficha técnica mockada.
+=======
+# TUIUTISUMMIT2025
+Projeto para Tuiuti Summit 2025
+>>>>>>> 1287573dbd7c587d8dc5a87583705d98e61b8d3a
