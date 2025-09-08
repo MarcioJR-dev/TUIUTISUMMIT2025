@@ -1,7 +1,41 @@
-<<<<<<< HEAD
-# Ficha Técnica Automática - Demo
+# Gerador de Fichas Técnicas
+
+Uma aplicação web para automatizar a geração de fichas técnicas a partir de documentos PDF, utilizando processamento de linguagem natural e inteligência artificial.
+
+## Descrição
+
+Esta aplicação foi desenvolvida para automatizar o processo de elaboração de fichas técnicas para projetos de engenharia, arquitetura e construção civil. A ferramenta utiliza a API do Gemini Pro para extrair e organizar informações relevantes de documentos técnicos em PDF, gerando fichas padronizadas que podem ser facilmente exportadas e compartilhadas.
+
+## Funcionalidades
+
+- Upload e processamento de arquivos PDF
+- Extração automática de informações técnicas relevantes
+- Suporte para processamento com modelo de ficha personalizado
+- Visualização interativa das fichas técnicas geradas
+- Exportação das fichas em formato JSON
+- Gerenciamento de arquivos processados
+
+## Tecnologias Utilizadas
+
+### Backend
+- Node.js
+- Express
+- Multer (para upload de arquivos)
+- pdf-parse (para extração de texto de PDFs)
+- Google Generative AI (API do Gemini Pro)
+
+### Frontend
+- React
+- Axios (para requisições HTTP)
+- React Icons
+- CSS personalizado
 
 ## Como rodar o projeto
+
+### Pré-requisitos
+- Node.js (v14 ou superior)
+- NPM ou Yarn
+- Chave de API do Gemini Pro
 
 ### 1. Backend (Node.js)
 
@@ -13,9 +47,18 @@
    ```
    npm install
    ```
-3. Rode o servidor:
+3. Configure o arquivo .env com sua chave de API do Gemini Pro:
+   ```
+   GEMINI_API_KEY=sua_chave_api_aqui
+   PORT=5000
+   ```
+4. Rode o servidor:
    ```
    npm start
+   ```
+   ou para desenvolvimento:
+   ```
+   npm run dev
    ```
    O backend ficará disponível em http://localhost:5000
 
@@ -29,68 +72,27 @@
    ```
    npm install
    ```
-3. Instale também as dependências de desenvolvimento:
-   ```
-   npm install --save-dev webpack webpack-cli webpack-dev-server babel-loader @babel/core @babel/preset-env @babel/preset-react html-webpack-plugin
-   ```
-4. Crie um arquivo `webpack.config.js` na pasta `frontend` com a configuração básica do Webpack (veja abaixo).
-5. Rode o frontend:
+3. Rode o frontend:
    ```
    npm start
    ```
    O frontend ficará disponível em http://localhost:8080
 
----
+## Uso
 
-## Exemplo de `webpack.config.js` para o React
+1. Acesse a aplicação em `http://localhost:8080`
+2. Selecione a aba "Upload Simples" para processar um único documento ou "Upload com Modelo" para processar um documento com base em um modelo de ficha
+3. Faça upload do(s) arquivo(s) PDF
+4. Aguarde o processamento
+5. Visualize a ficha técnica gerada
+6. Exporte a ficha em formato JSON se necessário
 
-```js
-const path = require('path');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
+## Contribuição
 
-module.exports = {
-  entry: './src/index.js',
-  output: {
-    path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.js',
-    clean: true,
-  },
-  module: {
-    rules: [
-      {
-        test: /\.jsx?$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env', '@babel/preset-react'],
-          },
-        },
-      },
-    ],
-  },
-  resolve: {
-    extensions: ['.js', '.jsx'],
-  },
-  plugins: [
-    new HtmlWebpackPlugin({
-      template: './public/index.html',
-    }),
-  ],
-  devServer: {
-    static: {
-      directory: path.join(__dirname, 'public'),
-    },
-    port: 8080,
-    open: true,
-  },
-};
-```
+Contribuições são bem-vindas! Para contribuir:
 
----
-
-Pronto! Agora você pode demonstrar o upload de um PDF e a geração da ficha técnica mockada.
-=======
-# TUIUTISUMMIT2025
-Projeto para Tuiuti Summit 2025
->>>>>>> 1287573dbd7c587d8dc5a87583705d98e61b8d3a
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
+4. Push para a branch (`git push origin feature/nova-feature`)
+5. Abra um Pull Request
