@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiUpload, FiFile, FiDownload, FiList } from 'react-icons/fi';
+import ReactMarkdown from 'react-markdown';
 
 function App() {
   const [activeTab, setActiveTab] = useState('upload');
@@ -83,40 +84,6 @@ function App() {
     }
   };
 
-  const handleUploadComModelo = async (e) => {
-    e.preventDefault();
-    if (!file || !modeloFile) {
-      setError('Por favor, selecione o documento e o modelo de ficha.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    
-    const formData = new FormData();
-    formData.append('documento', file);
-    formData.append('modelo', modeloFile);
-    
-    try {
-      // Processar com modelo
-      const response = await axios.post(`${API_URL}/processar-com-modelo`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      
-      setFicha(response.data);
-      
-      // Atualizar lista de arquivos
-      fetchArquivos();
-    } catch (err) {
-      console.error('Erro:', err);
-      setError(err.response?.data?.error || 'Erro ao processar os arquivos.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleExportarFicha = () => {
     if (!ficha) return;
     
@@ -148,12 +115,6 @@ function App() {
         onClick={() => setActiveTab('upload')}
       >
         Upload Simples
-      </div>
-      <div 
-        className={`tab ${activeTab === 'modelo' ? 'active' : ''}`}
-        onClick={() => setActiveTab('modelo')}
-      >
-        Upload com Modelo
       </div>
       <div 
         className={`tab ${activeTab === 'arquivos' ? 'active' : ''}`}
@@ -189,52 +150,6 @@ function App() {
           disabled={!file || loading}
         >
           {loading ? 'Processando...' : 'Gerar Ficha Técnica'}
-        </button>
-      </form>
-    </div>
-  );
-
-  const renderUploadComModelo = () => (
-    <div className={`tab-content ${activeTab === 'modelo' ? 'active' : ''}`}>
-      <form onSubmit={handleUploadComModelo}>
-        <div className="form-group">
-          <label>Selecione o documento PDF para análise:</label>
-          <div className="file-input-container">
-            <FiFile className="file-input-icon" />
-            <div className="file-input-text">
-              {file ? file.name : 'Arraste o documento ou clique para selecionar'}
-            </div>
-            <input 
-              type="file" 
-              accept=".pdf" 
-              onChange={(e) => handleFileChange(e, 'documento')} 
-            />
-          </div>
-          {file && <div className="file-name">{file.name}</div>}
-        </div>
-        
-        <div className="form-group">
-          <label>Selecione o modelo de ficha técnica (PDF):</label>
-          <div className="file-input-container">
-            <FiFile className="file-input-icon" />
-            <div className="file-input-text">
-              {modeloFile ? modeloFile.name : 'Arraste o modelo ou clique para selecionar'}
-            </div>
-            <input 
-              type="file" 
-              accept=".pdf" 
-              onChange={(e) => handleFileChange(e, 'modelo')} 
-            />
-          </div>
-          {modeloFile && <div className="file-name">{modeloFile.name}</div>}
-        </div>
-        
-        <button 
-          type="submit" 
-          className="btn btn-primary btn-block" 
-          disabled={!file || !modeloFile || loading}
-        >
-          {loading ? 'Processando...' : 'Gerar Ficha Técnica com Modelo'}
         </button>
       </form>
     </div>
@@ -288,50 +203,271 @@ function App() {
             {ficha.dadosAnalisados && (
               <div className="ficha-section">
                 <h4 className="ficha-section-title">Dados Extraídos</h4>
-                {Object.entries(ficha.dadosAnalisados).map(([key, value]) => {
-                  // Se for array de objetos, renderiza cada um
-                  if (Array.isArray(value)) {
-                    return (
-                      <div key={key} className="ficha-subsection">
-                        <h5>{key}</h5>
-                        {value.map((item, idx) => (
-                          typeof item === 'object' && item !== null ? (
-                            <div key={idx} className="ficha-item">
-                              {Object.entries(item).map(([subKey, subValue]) => (
-                                <div key={subKey} style={{ marginLeft: 10 }}>
-                                  <span className="ficha-item-label">{subKey}:</span> {String(subValue)}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div key={idx} className="ficha-item">{String(item)}</div>
-                          )
-                        ))}
+                
+                {/* Informações Gerais */}
+                {ficha.dadosAnalisados.informacoesGerais && (
+                  <div className="ficha-subsection">
+                    <h5>INFORMAÇÕES GERAIS</h5>
+                    <div className="ficha-grid">
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">PAÍS:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.informacoesGerais.pais}</div>
                       </div>
-                    );
-                  }
-                  // Se for objeto simples, renderiza suas propriedades
-                  if (typeof value === 'object' && value !== null) {
-                    return (
-                      <div key={key} className="ficha-subsection">
-                        <h5>{key}</h5>
-                        {Object.entries(value).map(([subKey, subValue]) => (
-                          <div key={subKey} className="ficha-item">
-                            <div className="ficha-item-label">{subKey}:</div>
-                            <div className="ficha-item-value">{String(subValue)}</div>
-                          </div>
-                        ))}
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">TIPO DE PROJETO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.informacoesGerais.tipoProjeto}</div>
                       </div>
-                    );
-                  }
-                  // Valor primitivo
-                  return (
-                    <div key={key} className="ficha-item">
-                      <div className="ficha-item-label">{key}:</div>
-                      <div className="ficha-item-value">{String(value)}</div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">CONTRATANTE:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.informacoesGerais.contratante}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">POTÊNCIA INSTALADA:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.informacoesGerais.potenciaInstalada}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">VALOR DO CONTRATO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.informacoesGerais.valorContrato}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">INÍCIO DE OPERAÇÃO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.informacoesGerais.inicioOperacao}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">PERÍODO DE EXECUÇÃO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.informacoesGerais.periodoExecucao}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">DURAÇÃO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.informacoesGerais.duracao}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">OBJETO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.informacoesGerais.objeto}</div>
+                      </div>
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                {/* Localização */}
+                {ficha.dadosAnalisados.localizacao && (
+                  <div className="ficha-subsection">
+                    <h5>LOCALIZAÇÃO</h5>
+                    <div className="ficha-grid">
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">LATITUDE:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.localizacao.latitude}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">LONGITUDE:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.localizacao.longitude}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">RIO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.localizacao.rio}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">BACIA:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.localizacao.bacia}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Desvio */}
+                {ficha.dadosAnalisados.desvio && (
+                  <div className="ficha-subsection">
+                    <h5>DESVIO</h5>
+                    <div className="ficha-grid">
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">TIPO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.desvio.tipo}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">VAZÃO DE DESVIO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.desvio.vazaoDesvio}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reservatório */}
+                {ficha.dadosAnalisados.reservatorio && (
+                  <div className="ficha-subsection">
+                    <h5>RESERVATÓRIO</h5>
+                    <div className="ficha-grid">
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">N.A MÁXIMO NORMAL DE MONTANTE:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.reservatorio.naMaximoNormalMontante}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">ÁREA NO NÍVEL MÁXIMO NORMAL:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.reservatorio.areaNivelMaximoNormal}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">VOLUME NO NÍVEL MÁXIMO NORMAL:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.reservatorio.volumeNivelMaximoNormal}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Barragem Principal */}
+                {ficha.dadosAnalisados.barragemPrincipal && (
+                  <div className="ficha-subsection">
+                    <h5>BARRAGEM PRINCIPAL</h5>
+                    <div className="ficha-grid">
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">TIPO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.barragemPrincipal.tipo}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">ALTURA MÁXIMA:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.barragemPrincipal.alturaMaxima}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">COMPRIMENTO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.barragemPrincipal.comprimento}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">VOLUME:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.barragemPrincipal.volume}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Barragens Complementares */}
+                {ficha.dadosAnalisados.barragensComplementares && (
+                  <div className="ficha-subsection">
+                    <h5>BARRAGENS COMPLEMENTARES</h5>
+                    <div className="ficha-grid">
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">TIPO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.barragensComplementares.tipo}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">COMPRIMENTO TOTAL:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.barragensComplementares.comprimentoTotal}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">ALTURA MÁXIMA:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.barragensComplementares.alturaMaxima}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">VOLUME TOTAL:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.barragensComplementares.volumeTotal}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Vertedouro */}
+                {ficha.dadosAnalisados.vertedouro && (
+                  <div className="ficha-subsection">
+                    <h5>VERTEDOURO</h5>
+                    <div className="ficha-grid">
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">TIPO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.vertedouro.tipo}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">NÚMERO DE VÃOS:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.vertedouro.numeroVaos}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">COMPRIMENTO TOTAL:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.vertedouro.comprimentoTotal}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">CAPACIDADE:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.vertedouro.capacidade}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">TR:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.vertedouro.tr}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Casa de Força Principal */}
+                {ficha.dadosAnalisados.casaForcaPrincipal && (
+                  <div className="ficha-subsection">
+                    <h5>CASA DE FORÇA PRINCIPAL</h5>
+                    <div className="ficha-grid">
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">TIPO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.casaForcaPrincipal.tipo}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">NÚMERO DE UNIDADES GERADORAS:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.casaForcaPrincipal.numeroUnidadesGeradoras}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">TIPO DE TURBINA:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.casaForcaPrincipal.tipoTurbina}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">POTÊNCIA UNITÁRIA:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.casaForcaPrincipal.potenciaUnitaria}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">RENDIMENTO:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.casaForcaPrincipal.rendimento}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">QUEDA BRUTA:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.casaForcaPrincipal.quedaBruta}</div>
+                      </div>
+                      <div className="ficha-item">
+                        <div className="ficha-item-label">VAZÃO MÁXIMA TURBINADA:</div>
+                        <div className="ficha-item-value">{ficha.dadosAnalisados.casaForcaPrincipal.vazaoMaximaTurbinada}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Materiais Utilizados */}
+                {ficha.dadosAnalisados.materiaisUtilizados && (
+                  <div className="ficha-subsection">
+                    <h5>MATERIAIS UTILIZADOS</h5>
+                    <div className="ficha-grid">
+                      {typeof ficha.dadosAnalisados.materiaisUtilizados === 'object' ? (
+                        Object.entries(ficha.dadosAnalisados.materiaisUtilizados).map(([material, quantidade]) => (
+                          <div key={material} className="ficha-item">
+                            <div className="ficha-item-label">{material}:</div>
+                            <div className="ficha-item-value">{quantidade}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="ficha-item">
+                          <div className="ficha-item-value">{ficha.dadosAnalisados.materiaisUtilizados}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Responsáveis Técnicos */}
+                {ficha.dadosAnalisados.responsaveisTecnicos && (
+                  <div className="ficha-subsection">
+                    <h5>RESPONSÁVEIS TÉCNICOS</h5>
+                    <div className="ficha-item">
+                      <div className="ficha-item-value">{ficha.dadosAnalisados.responsaveisTecnicos}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Observações Relevantes */}
+                {ficha.dadosAnalisados.observacoesRelevantes && (
+                  <div className="ficha-subsection">
+                    <h5>OBSERVAÇÕES RELEVANTES</h5>
+                    <div className="ficha-item">
+                      <div className="ficha-item-value">{ficha.dadosAnalisados.observacoesRelevantes}</div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             
@@ -339,6 +475,14 @@ function App() {
               <div className="ficha-section">
                 <h4 className="ficha-section-title">Amostra do Texto Extraído</h4>
                 <div className="text-preview">{ficha.textoExtraido}</div>
+              </div>
+            )}
+            {ficha.textoFormatado && (
+              <div className="ficha-section">
+                <h4 className="ficha-section-title">Dados Extraídos</h4>
+                <div className="text-preview">
+                  <ReactMarkdown>{ficha.textoFormatado}</ReactMarkdown>
+                </div>
               </div>
             )}
           </div>
@@ -364,7 +508,6 @@ function App() {
         )}
         
         {renderUploadSimples()}
-        {renderUploadComModelo()}
         {renderArquivos()}
       </div>
       

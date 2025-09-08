@@ -210,6 +210,30 @@ body {
   flex: 1;
 }
 
+.ficha-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.ficha-subsection {
+  margin-bottom: 25px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #0056b3;
+}
+
+.ficha-subsection h5 {
+  margin: 0 0 15px 0;
+  color: #0056b3;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .text-preview {
   max-height: 200px;
   overflow-y: auto;
