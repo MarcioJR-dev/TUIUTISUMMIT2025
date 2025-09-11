@@ -4,13 +4,17 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { analisarDocumento } from './gemini.js';
+import { v4 as uuidv4 } from 'uuid';
+import { analisarDocumento, analisarTextoConsolidado } from './gemini.js';
 
 // Carrega variáveis de ambiente
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Armazenamento de processamentos em memória
+const processamentos = new Map();
 
 // Cria diretório de uploads se não existir
 if (!fs.existsSync('uploads')) {
@@ -43,11 +47,12 @@ const upload = multer({
     }
   },
   limits: {
-    fileSize: 10 * 1024 * 1024 // Limite de 10MB
+    fileSize: 10 * 1024 * 1024, // Limite de 10MB por arquivo
+    files: 10 // Máximo 10 arquivos por upload
   }
 });
 
-// Endpoint para upload de arquivo
+// Endpoint para upload de arquivo único
 app.post('/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -59,6 +64,223 @@ app.post('/upload', upload.single('file'), (req, res) => {
     path: req.file.path
   });
 });
+
+// Endpoint para upload de múltiplos arquivos
+app.post('/upload-multiple', upload.array('files', 10), (req, res) => {
+  console.log('Upload múltiplo recebido:', req.files?.length || 0, 'arquivos');
+  
+  if (!req.files || req.files.length === 0) {
+    console.log('Erro: Nenhum arquivo enviado');
+    return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+  }
+
+  // Gera ID único para o processamento
+  const processamentoId = uuidv4();
+  console.log('ID do processamento gerado:', processamentoId);
+  
+  // Inicializa o processamento
+  const processamento = {
+    id: processamentoId,
+    status: 'iniciando',
+    totalArquivos: req.files.length,
+    processados: 0,
+    pendentes: req.files.length,
+    erros: 0,
+    resultados: [],
+    dadosConsolidados: null,
+    dataInicio: new Date().toISOString(),
+    dataFim: null,
+    arquivos: req.files.map(file => ({
+      filename: file.filename,
+      originalname: file.originalname,
+      path: file.path,
+      status: 'pendente'
+    }))
+  };
+
+  // Armazena o processamento
+  processamentos.set(processamentoId, processamento);
+  console.log('Processamento armazenado:', processamentoId);
+
+  // Inicia o processamento em background
+  console.log('Iniciando processamento em background...');
+  processarPDFsSequencial(processamentoId);
+
+  // Retorna o ID do processamento
+  console.log('Retornando resposta para o cliente');
+  res.json({
+    processamentoId: processamentoId,
+    totalArquivos: req.files.length,
+    status: 'iniciando',
+    message: 'Processamento iniciado. Use o ID para acompanhar o progresso.'
+  });
+});
+
+// Função para processar PDFs sequencialmente
+async function processarPDFsSequencial(processamentoId) {
+  console.log(`Iniciando processamento: ${processamentoId}`);
+  const processamento = processamentos.get(processamentoId);
+  if (!processamento) {
+    console.log(`Processamento não encontrado: ${processamentoId}`);
+    return;
+  }
+
+  try {
+    processamento.status = 'processando';
+    console.log(`Status alterado para processando: ${processamentoId}`);
+    
+    for (let i = 0; i < processamento.arquivos.length; i++) {
+      const arquivo = processamento.arquivos[i];
+      console.log(`Processando arquivo ${i + 1}/${processamento.arquivos.length}: ${arquivo.filename}`);
+      
+      try {
+        // Atualiza status do arquivo
+        arquivo.status = 'processando';
+        
+        // Lê o arquivo PDF
+        console.log(`Lendo arquivo: ${arquivo.path}`);
+        const dataBuffer = fs.readFileSync(arquivo.path);
+        console.log(`Arquivo lido, tamanho: ${dataBuffer.length} bytes`);
+        
+        // Analisa com Gemini
+        console.log(`Enviando para Gemini: ${arquivo.filename}`);
+        const dadosAnalisados = await analisarDocumento(dataBuffer, MODELO_FIXO);
+        console.log(`Resposta do Gemini recebida para: ${arquivo.filename}`);
+        
+        // Adiciona resultado
+        processamento.resultados.push({
+          arquivo: arquivo.filename,
+          originalname: arquivo.originalname,
+          status: 'sucesso',
+          dadosAnalisados: dadosAnalisados,
+          dataProcessamento: new Date().toISOString()
+        });
+        
+        arquivo.status = 'concluido';
+        processamento.processados++;
+        processamento.pendentes--;
+        
+      } catch (erro) {
+        console.error(`Erro ao processar ${arquivo.filename}:`, erro);
+        
+        processamento.resultados.push({
+          arquivo: arquivo.filename,
+          originalname: arquivo.originalname,
+          status: 'erro',
+          erro: erro.message,
+          dataProcessamento: new Date().toISOString()
+        });
+        
+        arquivo.status = 'erro';
+        processamento.erros++;
+        processamento.pendentes--;
+      }
+    }
+    
+    // Consolida dados de todos os PDFs processados com sucesso
+    console.log(`Consolidando dados para: ${processamentoId}`);
+    if (processamento.resultados.filter(r => r.status === 'sucesso').length > 0) {
+      processamento.dadosConsolidados = await consolidarDados(processamento.resultados);
+    }
+    
+    processamento.status = 'concluido';
+    processamento.dataFim = new Date().toISOString();
+    console.log(`Processamento concluído: ${processamentoId}`);
+    
+  } catch (erro) {
+    console.error('Erro no processamento:', erro);
+    processamento.status = 'erro';
+    processamento.erro = erro.message;
+    processamento.dataFim = new Date().toISOString();
+    console.log(`Processamento com erro: ${processamentoId} - ${erro.message}`);
+  }
+}
+
+// Função para consolidar dados de múltiplos PDFs
+async function consolidarDados(resultados) {
+  const sucessos = resultados.filter(r => r.status === 'sucesso');
+  
+  if (sucessos.length === 0) return null;
+  
+  console.log('Consolidando dados de', sucessos.length, 'PDFs processados com sucesso');
+  
+  // Criar um texto consolidado com todos os dados extraídos
+  let textoConsolidado = `DADOS CONSOLIDADOS DE ${sucessos.length} PROJETOS:\n\n`;
+  
+  sucessos.forEach((resultado, index) => {
+    textoConsolidado += `=== PROJETO ${index + 1}: ${resultado.originalname} ===\n`;
+    textoConsolidado += `Arquivo: ${resultado.arquivo}\n\n`;
+    
+    // Adicionar dados estruturados do projeto
+    if (resultado.dadosAnalisados) {
+      const dados = resultado.dadosAnalisados;
+      
+      if (dados.informacoesGerais) {
+        textoConsolidado += `INFORMAÇÕES GERAIS:\n`;
+        Object.entries(dados.informacoesGerais).forEach(([key, value]) => {
+          textoConsolidado += `${key}: ${value}\n`;
+        });
+        textoConsolidado += `\n`;
+      }
+      
+      if (dados.localizacao) {
+        textoConsolidado += `LOCALIZAÇÃO:\n`;
+        Object.entries(dados.localizacao).forEach(([key, value]) => {
+          textoConsolidado += `${key}: ${value}\n`;
+        });
+        textoConsolidado += `\n`;
+      }
+      
+      if (dados.barragemPrincipal) {
+        textoConsolidado += `BARRAGEM PRINCIPAL:\n`;
+        Object.entries(dados.barragemPrincipal).forEach(([key, value]) => {
+          textoConsolidado += `${key}: ${value}\n`;
+        });
+        textoConsolidado += `\n`;
+      }
+      
+      if (dados.casaForcaPrincipal) {
+        textoConsolidado += `CASA DE FORÇA PRINCIPAL:\n`;
+        Object.entries(dados.casaForcaPrincipal).forEach(([key, value]) => {
+          textoConsolidado += `${key}: ${value}\n`;
+        });
+        textoConsolidado += `\n`;
+      }
+    }
+    
+    textoConsolidado += `\n---\n\n`;
+  });
+  
+  console.log('Texto consolidado criado, enviando para Gemini...');
+  
+  // Enviar dados consolidados para o Gemini criar uma ficha técnica unificada
+  try {
+    const fichaConsolidada = await analisarTextoConsolidado(textoConsolidado, MODELO_FIXO);
+    console.log('Ficha consolidada criada pelo Gemini');
+    
+    return {
+      totalProjetos: sucessos.length,
+      projetos: sucessos.map(r => ({
+        arquivo: r.arquivo,
+        originalname: r.originalname,
+        dados: r.dadosAnalisados
+      })),
+      fichaConsolidada: fichaConsolidada,
+      textoConsolidado: textoConsolidado
+    };
+  } catch (erro) {
+    console.error('Erro ao criar ficha consolidada:', erro);
+    return {
+      totalProjetos: sucessos.length,
+      projetos: sucessos.map(r => ({
+        arquivo: r.arquivo,
+        originalname: r.originalname,
+        dados: r.dadosAnalisados
+      })),
+      erro: erro.message
+    };
+  }
+}
 
 // Remover a leitura do PDF do modelo fixo
 // Definir o modelo fixo como string
@@ -130,6 +352,52 @@ app.get('/ficha/:filename', async (req, res) => {
     console.error('Erro ao processar o PDF:', err);
     res.status(500).json({ error: 'Erro ao processar o PDF', details: err.message });
   }
+});
+
+// Endpoint para acompanhar status do processamento
+app.get('/processamento/:id/status', (req, res) => {
+  const { id } = req.params;
+  const processamento = processamentos.get(id);
+  
+  if (!processamento) {
+    return res.status(404).json({ error: 'Processamento não encontrado.' });
+  }
+  
+  res.json({
+    id: processamento.id,
+    status: processamento.status,
+    totalArquivos: processamento.totalArquivos,
+    processados: processamento.processados,
+    pendentes: processamento.pendentes,
+    erros: processamento.erros,
+    dataInicio: processamento.dataInicio,
+    dataFim: processamento.dataFim,
+    progresso: Math.round((processamento.processados / processamento.totalArquivos) * 100)
+  });
+});
+
+// Endpoint para obter resultado completo do processamento
+app.get('/processamento/:id/resultado', (req, res) => {
+  const { id } = req.params;
+  const processamento = processamentos.get(id);
+  
+  if (!processamento) {
+    return res.status(404).json({ error: 'Processamento não encontrado.' });
+  }
+  
+  res.json({
+    id: processamento.id,
+    status: processamento.status,
+    totalArquivos: processamento.totalArquivos,
+    processados: processamento.processados,
+    pendentes: processamento.pendentes,
+    erros: processamento.erros,
+    resultados: processamento.resultados,
+    dadosConsolidados: processamento.dadosConsolidados,
+    dataInicio: processamento.dataInicio,
+    dataFim: processamento.dataFim,
+    progresso: Math.round((processamento.processados / processamento.totalArquivos) * 100)
+  });
 });
 
 // Endpoint para listar todos os arquivos processados
