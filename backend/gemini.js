@@ -7,15 +7,15 @@ dotenv.config();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 /**
- * Analisa o conteúdo de um PDF usando o modelo Gemini
- * @param {string} pdfText - Texto extraído do PDF
+ * Analisa o conteúdo de um PDF usando o modelo Gemini (multimodal)
+ * @param {Buffer} pdfBuffer - Buffer do arquivo PDF
  * @param {string} modeloFicha - Modelo de ficha técnica (opcional)
  * @returns {Object} - Objeto com as informações extraídas e formatadas
  */
-export async function analisarDocumento(pdfText, modeloFicha = null) {
+export async function analisarDocumento(pdfBuffer, modeloFicha = null) {
   try {
     // Prompt para retornar JSON estruturado em seções
-    let prompt = `Extraia do texto abaixo as informações para preencher a ficha técnica. Retorne um JSON com as seguintes seções e campos. Se algum campo não estiver presente, use "FALTANDO INFORMAÇÃO".
+    let prompt = `Analise este documento PDF (que pode conter texto e imagens) e extraia as informações para preencher a ficha técnica. Retorne um JSON com as seguintes seções e campos. Se algum campo não estiver presente, use "FALTANDO INFORMAÇÃO".
 
 Estrutura desejada:
 {
@@ -76,16 +76,25 @@ Estrutura desejada:
   "materiaisUtilizados": "valor",
   "responsaveisTecnicos": "valor",
   "observacoesRelevantes": "valor"
-}
+}`;
 
-TEXTO EXTRAÍDO:
-${pdfText}
-`;
-
-    // Chama o modelo Gemini
+    // Chama o modelo Gemini com o PDF diretamente (multimodal)
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: prompt,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: "application/pdf",
+                data: pdfBuffer.toString('base64')
+              }
+            }
+          ]
+        }
+      ],
     });
 
     const text = response.text;

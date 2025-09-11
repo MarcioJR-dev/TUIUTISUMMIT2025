@@ -3,7 +3,6 @@ import multer from 'multer';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
-import pdf from 'pdf-parse';
 import dotenv from 'dotenv';
 import { analisarDocumento } from './gemini.js';
 
@@ -106,7 +105,7 @@ TIPO DE TURBINA / POTÊNCIA UNITÁRIA / RENDIMENTO: [preencher] / [preencher] MW
 QUEDA BRUTA / VAZÃO MÁXIMA TURBINADA: [preencher] m / [preencher] m³/s
 CARACTERÍSTICAS ESPECÍFICAS: [preencher]`;
 
-// Endpoint para ficha técnica com extração de texto do PDF usando pdf-parse e análise com Gemini
+// Endpoint para ficha técnica com análise multimodal do PDF usando Gemini
 app.get('/ficha/:filename', async (req, res) => {
   const { filename } = req.params;
   const filePath = path.join('uploads', filename);
@@ -116,20 +115,16 @@ app.get('/ficha/:filename', async (req, res) => {
     }
 
     const dataBuffer = fs.readFileSync(filePath);
-    const pdfData = await pdf(dataBuffer);
     
-    // Extrai o texto do PDF
-    const textoExtraido = pdfData.text;
-    
-    // Analisa o texto do PDF do usuário com o modelo fixo
-    const dadosAnalisados = await analisarDocumento(textoExtraido, MODELO_FIXO);
+    // Analisa o PDF diretamente com Gemini (multimodal - texto + imagens)
+    const dadosAnalisados = await analisarDocumento(dataBuffer, MODELO_FIXO);
     
     // Prepara a resposta com os dados analisados
     res.json({
       arquivo: filename,
-      textoExtraido: textoExtraido, // Agora retorna o texto completo
       dadosAnalisados,
-      dataProcessamento: new Date().toISOString()
+      dataProcessamento: new Date().toISOString(),
+      metodo: 'multimodal' // Indica que usou análise multimodal
     });
   } catch (err) {
     console.error('Erro ao processar o PDF:', err);
