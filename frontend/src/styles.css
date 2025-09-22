@@ -303,6 +303,10 @@ body {
   transform: translateX(5px);
 }
 
+/* .arquivos-details {
+  display: flex;
+} */
+
 .arquivo-info {
   display: flex;
   flex-direction: column;
